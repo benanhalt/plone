@@ -1,22 +1,22 @@
 #lang plai
 
-(define-type ArithC
+(define-type ExprC
   [numC (n number?)]
-  [plusC (l ArithC?) (r ArithC?)]
-  [multC (l ArithC?) (r ArithC?)])
+  [plusC (l ExprC?) (r ExprC?)]
+  [multC (l ExprC?) (r ExprC?)])
 
 (define (interp a)
-  (type-case ArithC a
+  (type-case ExprC a
     [numC (n) n]
     [plusC (l r) (+ (interp l) (interp r))]
     [multC (l r) (* (interp l) (interp r))]))
 
-(define-type ArithS
+(define-type ExprS
   [numS (n number?)]
-  [plusS (l ArithS?) (r ArithS?)]
-  [bminusS (l ArithS?) (r ArithS?)]
-  [uminusS (e ArithS?)]
-  [multS (l ArithS?) (r ArithS?)])
+  [plusS (l ExprS?) (r ExprS?)]
+  [bminusS (l ExprS?) (r ExprS?)]
+  [uminusS (e ExprS?)]
+  [multS (l ExprS?) (r ExprS?)])
 
 (define (parse e)
   (cond
@@ -29,7 +29,7 @@
               (bminusS (parse (cadr e)) (parse (caddr e))))])]))
 
 (define (desugar as)
-  (type-case ArithS as
+  (type-case ExprS as
     [numS (n) (numC n)]
     [plusS (l r) (plusC (desugar l) (desugar r))]
     [multS (l r) (multC (desugar l) (desugar r))]
