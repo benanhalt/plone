@@ -3,6 +3,10 @@
 (define-type FuncDefC
   [fdC (name symbol?) (arg symbol?) (body ExprC?)])
 
+(define-type Env
+  [mt]
+  [binding (id symbol?) (val number?) (rest Env?)])
+
 (define-type ExprC
   [idC (s symbol?)]
   [appC (fun symbol?) (arg ExprC?)]
@@ -12,17 +16,27 @@
   [multC (l ExprC?) (r ExprC?)])
 
 ; interp : ExprC * (listOf FuncDefC) -> number
-(define (interp e fds)
+(define (interp e fds env)
   (type-case ExprC e
-    [idC (s) (error)]
+    [idC (s) (lookup s env)]
     [appC (fun arg)
           (let ([fd (get-fundef fun fds)])
-            (interp (subst (numC (interp arg fds)) (fdC-arg fd) (fdC-body fd))
-                         fds))]
-    [ifC (p c a) (if (eq? (interp p fds) 0) (interp a fds) (interp c fds))]
+            (interp (fdC-body fd) fds
+                    (binding (fdC-arg fd)
+                             (interp arg fds env)
+                             (mt))))]
+    [ifC (p c a) (if (eq? (interp p fds env) 0) (interp a fds env) (interp c fds env))]
     [numC (n) n]
-    [plusC (l r) (+ (interp l fds) (interp r fds))]
-    [multC (l r) (* (interp l fds) (interp r fds))]))
+    [plusC (l r) (+ (interp l fds env) (interp r fds env))]
+    [multC (l r) (* (interp l fds env) (interp r fds env))]))
+
+; lookup : symbol * Env -> number
+(define (lookup s env)
+  (type-case Env env
+    [mt () (error "unbound variable")]
+    [binding (id val rest)
+             (if (eq? id s) val
+                 (lookup s rest))]))
 
 ; get-fundef : symbol * (listOf FuncDefC) -> FuncDefC
 (define (get-fundef name fds)
@@ -84,5 +98,6 @@
 
 (define fds
   (list
-   (fdC 'f 'x (desugar (parse '(* x x))))
-   (fdC 'g 'y (desugar (parse '(+ (f y) 3))))))
+   (fdC 'f 'x (desugar (parse '(* x y))))
+   (fdC 'g 'y (desugar (parse '(+ (f y) 3))))
+   (fdC 'h 'y (desugar (parse '(+ y (f 3)))))))
