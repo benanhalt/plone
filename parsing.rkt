@@ -17,8 +17,8 @@
     [idC (s) (error)]
     [appC (fun arg)
           (let ([fd (get-fundef fun fds)])
-            (interp (subst (numC (interp arg)) fdC-arg fdC-body)
-                         fds)])]
+            (interp (subst (numC (interp arg fds)) (fdC-arg fd) (fdC-body fd))
+                         fds))]
     [ifC (p c a) (if (eq? (interp p fds) 0) (interp a fds) (interp c fds))]
     [numC (n) n]
     [plusC (l r) (+ (interp l fds) (interp r fds))]
@@ -80,3 +80,9 @@
     [bminusS (l r) (plusC (desugar l)
                           (multC
                            (numC -1) (desugar r)))]))
+
+
+(define fds
+  (list
+   (fdC 'f 'x (desugar (parse '(* x x))))
+   (fdC 'g 'y (desugar (parse '(+ (f y) 3))))))
