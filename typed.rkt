@@ -19,7 +19,6 @@
   [plusC (l : ExprC) (r : ExprC)]
   [multC (l : ExprC) (r : ExprC)])
 
-; interp : ExprC * (listOf FuncDefC) -> number
 (define (interp [e : ExprC] [fds : (listof FuncDefC)] [env : Env]) : number
   (type-case ExprC e
     [idC (s) (lookup s env)]
@@ -33,13 +32,11 @@
     [plusC (l r) (+ (interp l fds env) (interp r fds env))]
     [multC (l r) (* (interp l fds env) (interp r fds env))]))
 
-; lookup : symbol * Env -> number
 (define (lookup [s : symbol] [env : Env]) : number
   (cond [(empty? env)  (error 'lookup "unbound variable")]
         [(eq? s (bind-id (first env))) (bind-val (first env))]
         [else (lookup s (rest env))]))
 
-; get-fundef : symbol * (listOf FuncDefC) -> FuncDefC
 (define (get-fundef [name : symbol] [fds : (listof FuncDefC)]) : FuncDefC
   (cond [(empty? fds) (error 'get-fundef "undefined function")]
         [(eq? name (fdC-name (first fds))) (first fds)]
@@ -83,7 +80,7 @@
               (bminusS (parse (second l)) (parse (third l))))]
       [else (appS (s-exp->symbol (first l)) (parse (second l)))]))]))
 
-(define (desugar as)
+(define (desugar [as : ExprS]) : ExprC
   (type-case ExprS as
     [idS (s) (idC s)]
     [appS (f a) (appC f (desugar a))]
