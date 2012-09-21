@@ -56,14 +56,21 @@
 
 (define (build-with operands)
   (match operands
-    [(list bindings body) (with (map build-binding bindings) (parse body))]
+    [(list bindings body) (with (build-bindings bindings '()) (parse body))]
     [_ (error "improper with form")]))
 
-(define (build-binding sexp)
-  (match sexp
-    [(list name expr) (if (valid-id? name) (binding name (parse expr))
-                          (error "invalid identifier" name))]
-    [_ (error "improper bindings" sexp)]))
+(define (build-bindings bindings seen)
+  (if (empty? bindings) '()
+      (match (first bindings)
+        [(list name expr)
+         (cond
+          [(not (valid-id? name)) (error "invalid identifier" name)]
+          [(member name seen) (error "duplicate name in binding list")]
+          [else (cons (binding name (parse expr))
+                      (build-bindings
+                       (rest bindings)
+                       (cons name seen)))])]
+        [_ (error "improper bindings" (first bindings))])))
 
 (define (valid-id? name)
   (cond
