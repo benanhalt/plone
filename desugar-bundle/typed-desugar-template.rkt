@@ -28,17 +28,35 @@
   (foldl (lambda (exp result) (and exp result)) (TrueC) exprs))
 
 ;; map-subtract builds an expression that maps 'num- over a list of expressions
-(define (map-subtract (exprs : (listof ExprC))) : ExprC
-  (foldl (lambda (expr result) (Prim2C 'num- result expr)) (first exprs) (rest exprs)))
+(define (map-primop (op : symbol) (exprs : (listof ExprC))) : ExprC
+  (foldl (lambda (expr result) (Prim2C op result expr)) (first exprs) (rest exprs)))
 
 
-(define (desugar-subtract (args : (listof ExprP))) : ExprC
+(define (desugar-primop (op : symbol) (args : (listof ExprP))) : ExprC
   (local ([define ids (make-ids (length args))]
           [define id-exps (map IdC ids)])
-    (cascade-lets ids (map desugar args)
-      (IfC (all (map (lambda (e) (check-type e "number")) id-exps))
-           (map-subtract id-exps)
-           (ErrorC (StrC "Bad arguments to -"))))))
+         (cascade-lets
+          ids (map desugar args)
+          (case op
+            ('+ (IfC
+                 (all (map (lambda (e) (check-type e "number")) id-exps))
+                 (map-primop 'num+ id-exps)
+                 (IfC (all (map (lambda (e) (check-type e "string")) id-exps))
+                      (map-primop 'string+ id-exps)
+                      (ErrorC (StrC "Bad arguments to +")))))
+            ('== (map-primop '== id-exps))
+            (else (IfC
+                 (all (map (lambda (e) (check-type e "number")) id-exps))
+                 (map-primop (if (symbol=? '- op) 'num- op) id-exps)
+                 (ErrorC (StrC "Bad arguments to -"))))))))
+
+(define (pre-add (id : symbol) (amount : ExprC))
+  (SeqC (Set!C id (Prim2C 'num+ amount (IdC id))) (IdC id)))
+
+(define (post-add (id : symbol) (amount : ExprC))
+  (LetC 'prev (IdC id)
+        (SeqC (Set!C id (Prim2C 'num+ amount (IdC id)))
+              (IdC 'prev))))
 
 (define (desugar (exprP : ExprP)) : ExprC
   (type-case ExprP exprP
@@ -47,6 +65,19 @@
     [FalseP () (FalseC)]
     [StrP (s) (StrC s)]
     [IdP (name) (IdC name)]
+    [FuncP (args body) (FuncC args (desugar body))]
+    [AppP (func args) (AppC (desugar func) (map desugar args))]
+    [DefvarP (id bind body) (LetC id (desugar bind) (desugar body))]
+    [DeffunP (name ids funbody body)
+      (LetC name (FuncC ids (desugar funbody)) (desugar body))]
+
+    [PrimAssignP (op lhs val)
+                 (let ([lhs-expr
+                        (type-case LHS lhs
+                          [IdLHS (id) (IdP id)]
+                          [DotLHS (obj field) (DotP obj field)]
+                          [BracketLHS (obj field) (BracketP obj field)])])
+                   (desugar (AssignP lhs (PrimP op (list lhs-expr val)))))]
 
     [AssignP (lhs val)
              (type-case LHS lhs
@@ -65,6 +96,13 @@
 
     [DotP (obj field) (GetFieldC (desugar obj) (StrC (symbol->string field)))]
     [BracketP (obj field) (GetFieldC (desugar obj) (desugar field))]
+    [DotMethodP (obj field args) (desugar (AppP (DotP obj field) args))]
+    [BrackMethodP (obj field args) (desugar (AppP (BracketP obj field) args))]
+
+    [PreIncP (id) (pre-add id (NumC 1))]
+    [PostIncP (id) (post-add id (NumC 1))]
+    [PreDecP (id) (pre-add id (NumC -1))]
+    [PostDecP (id) (post-add id (NumC -1))]
 
     [SeqP (es)
           (cond
@@ -76,9 +114,15 @@
     [IfP (p c a) (IfC (desugar p) (desugar c) (desugar a))]
     [PrimP (op args)
         (case op
-          ['- (cond
+          ['print (cond
+                   [(= 0 (length args)) (ErrorC (StrC "Empty list for print"))]
+                   [(= 1 (length args)) (Prim1C 'print (desugar (first args)))]
+                   [else (desugar (SeqP (list (PrimP 'print (list (first args)))
+                                              (PrimP 'print (rest args)))))])]
+ 
+          [else (cond
                 [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
-                [(< 0 (length args)) (desugar-subtract args)])])]
+                [(< 0 (length args)) (desugar-primop op args)])])]
 
     [WhileP (test body)
           ;; dummy-fun will tell us it was called if we do so accidentally
@@ -106,6 +150,23 @@
                          (AppC (IdC 'while-var) (list)))))
 
                (FalseC)))]
-    [else (ErrorC (StrC (string-append "Haven't desugared a case yet:\n"
-                                       (to-string exprP))))]))
 
+    [ForP (init test update body)
+          (local ([define dummy-fun (FuncC (list) (ErrorC (StrC "Dummy function")))])
+          (LetC 'for-v (desugar init)
+            (IfC (desugar test)
+                 (LetC 'for-func-var dummy-fun
+                   (LetC 'for-func
+                     (FuncC (list)
+                       (LetC 'for-v3 (desugar body)
+                         (SeqC
+                          (desugar update)
+                          (IfC (desugar test)
+                               (AppC (IdC 'for-func-var) (list))
+                               (IdC 'for-v3)))))
+                     (SeqC (Set!C 'for-func-var (IdC 'for-func))
+                           (AppC (IdC 'for-func-var) (list)))))
+                 (IdC 'for-v))))]))
+
+;;    [else (ErrorC (StrC (string-append "Haven't desugared a case yet:\n"
+;;                                       (to-string exprP))))]))
