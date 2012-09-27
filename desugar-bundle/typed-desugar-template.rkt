@@ -78,9 +78,9 @@
                           (desugar (AssignP lhs (PrimP op (list (IdP id) val))))]
                    [DotLHS (obj field)
                            (desugar (DefvarP 'obj-var obj
-                                      (AssignP (DotLHS (IdP 'obj-var) 'field)
+                                      (AssignP (DotLHS (IdP 'obj-var) field)
                                                (PrimP op (list
-                                                          (DotP (IdP 'obj-var) 'field)
+                                                          (DotP (IdP 'obj-var) field)
                                                           val)))))]
                    [BracketLHS (obj field)
                                (desugar (DefvarP 'obj-var obj
