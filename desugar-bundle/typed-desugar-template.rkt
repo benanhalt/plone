@@ -70,7 +70,10 @@
     [AppP (func args) (AppC (desugar func) (map desugar args))]
     [DefvarP (id bind body) (LetC id (desugar bind) (desugar body))]
     [DeffunP (name ids funbody body)
-      (LetC name (FuncC ids (desugar funbody)) (desugar body))]
+      (LetC name (FuncC ids (ErrorC (StrC "Dummy fun")))
+            (SeqC
+             (Set!C name (FuncC ids (desugar funbody)))
+             (desugar body)))]
 
     [PrimAssignP (op lhs val)
                  (type-case LHS lhs
