@@ -73,13 +73,22 @@
       (LetC name (FuncC ids (desugar funbody)) (desugar body))]
 
     [PrimAssignP (op lhs val)
-                 (let ([lhs-expr
-                        (type-case LHS lhs
-                          [IdLHS (id) (IdP id)]
-                          [DotLHS (obj field) (DotP obj field)]
-                          [BracketLHS (obj field) (BracketP obj field)])])
-                   (desugar (AssignP lhs (PrimP op (list lhs-expr val)))))]
-
+                 (type-case LHS lhs
+                   [IdLHS (id)
+                          (desugar (AssignP lhs (PrimP op (list (IdP id) val))))]
+                   [DotLHS (obj field)
+                           (desugar (DefvarP 'obj-var obj
+                                      (AssignP (DotLHS (IdP 'obj-var) 'field)
+                                               (PrimP op (list
+                                                          (DotP (IdP 'obj-var) 'field)
+                                                          val)))))]
+                   [BracketLHS (obj field)
+                               (desugar (DefvarP 'obj-var obj
+                                          (DefvarP 'field-var field
+                                            (AssignP (BracketLHS (IdP 'obj-var) (IdP 'field-var))
+                                                     (PrimP op (list
+                                                                (BracketP (IdP 'obj-var) (IdP 'field-var))
+                                                                val))))))])]
     [AssignP (lhs val)
              (type-case LHS lhs
                [IdLHS (id) (Set!C id (desugar val))]
