@@ -44,11 +44,12 @@
                  (IfC (all (map (lambda (e) (check-type e "string")) id-exps))
                       (map-primop 'string+ id-exps)
                       (ErrorC (StrC "Bad arguments to +")))))
-            ('== (map-primop '== id-exps))
-            (else (IfC
+            ('- (IfC
                  (all (map (lambda (e) (check-type e "number")) id-exps))
-                 (map-primop (if (symbol=? '- op) 'num- op) id-exps)
-                 (ErrorC (StrC "Bad arguments to -"))))))))
+                 (map-primop 'num- id-exps)
+                 (ErrorC (StrC "Bad arguments to -"))))
+            ('== (map-primop '== id-exps))
+            (else (map-primop (if (symbol=? '- op) 'num- op) id-exps))))))
 
 (define (pre-add (id : symbol) (amount : ExprC))
   (SeqC (Set!C id (Prim2C 'num+ amount (IdC id))) (IdC id)))
@@ -96,8 +97,12 @@
 
     [DotP (obj field) (GetFieldC (desugar obj) (StrC (symbol->string field)))]
     [BracketP (obj field) (GetFieldC (desugar obj) (desugar field))]
-    [DotMethodP (obj field args) (desugar (AppP (DotP obj field) args))]
-    [BrackMethodP (obj field args) (desugar (AppP (BracketP obj field) args))]
+    [DotMethodP (obj field args) (desugar (DefvarP 'self obj
+                                            (AppP (DotP (IdP 'self) field)
+                                                  (cons (IdP 'self) args))))]
+    [BrackMethodP (obj field args) (desugar (DefvarP 'self obj
+                                              (AppP (BracketP (IdP 'self) field)
+                                                    (cons (IdP 'self) args))))]
 
     [PreIncP (id) (pre-add id (NumC 1))]
     [PostIncP (id) (post-add id (NumC 1))]
@@ -119,7 +124,17 @@
                    [(= 1 (length args)) (Prim1C 'print (desugar (first args)))]
                    [else (desugar (SeqP (list (PrimP 'print (list (first args)))
                                               (PrimP 'print (rest args)))))])]
- 
+
+          ['< (cond
+               [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
+               [(= 2 (length args)) (Prim2C op (desugar (first args)) (desugar (second args)))]
+               [else (ErrorC (StrC "Bad primop"))])]
+
+          ['> (cond
+               [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
+               [(= 2 (length args)) (Prim2C op (desugar (first args)) (desugar (second args)))]
+               [else (ErrorC (StrC "Bad primop"))])]
+          
           [else (cond
                 [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
                 [(< 0 (length args)) (desugar-primop op args)])])]
