@@ -47,9 +47,7 @@
             ('- (IfC
                  (all (map (lambda (e) (check-type e "number")) id-exps))
                  (map-primop 'num- id-exps)
-                 (ErrorC (StrC "Bad arguments to -"))))
-            ('== (map-primop '== id-exps))
-            (else (map-primop (if (symbol=? '- op) 'num- op) id-exps))))))
+                 (ErrorC (StrC "Bad arguments to -"))))))))
 
 (define (pre-add (id : symbol) (amount : ExprC))
   (SeqC (Set!C id (Prim2C 'num+ amount (IdC id))) (IdC id)))
@@ -58,6 +56,12 @@
   (LetC 'prev (IdC id)
         (SeqC (Set!C id (Prim2C 'num+ amount (IdC id)))
               (IdC 'prev))))
+
+(define (binary-primop (op : symbol) (args : (listof ExprP))) : ExprC
+  (cond
+   [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
+   [(= 2 (length args)) (Prim2C op (desugar (first args)) (desugar (second args)))]
+   [else (ErrorC (StrC "Bad primop"))]))
 
 (define (desugar (exprP : ExprP)) : ExprC
   (type-case ExprP exprP
@@ -137,16 +141,10 @@
                    [else (desugar (SeqP (list (PrimP 'print (list (first args)))
                                               (PrimP 'print (rest args)))))])]
 
-          ['< (cond
-               [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
-               [(= 2 (length args)) (Prim2C op (desugar (first args)) (desugar (second args)))]
-               [else (ErrorC (StrC "Bad primop"))])]
+          ['< (binary-primop op args)]
+          ['> (binary-primop op args)]
+          ['== (binary-primop op args)]
 
-          ['> (cond
-               [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
-               [(= 2 (length args)) (Prim2C op (desugar (first args)) (desugar (second args)))]
-               [else (ErrorC (StrC "Bad primop"))])]
-          
           [else (cond
                 [(= 0 (length args)) (ErrorC (StrC "Empty list for prim op"))]
                 [(< 0 (length args)) (desugar-primop op args)])])]
